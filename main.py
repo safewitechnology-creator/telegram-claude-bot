@@ -17,6 +17,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
 )
+# httpx logs each request URL, which contains the Telegram bot token in plaintext.
+# Raise it to WARNING to avoid leaking the token and to cut log spam.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("claude-telegram-bot")
 
 # ---------------------------------------------------------------------------
