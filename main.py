@@ -4,6 +4,7 @@ import os
 from anthropic import AsyncAnthropic, APIStatusError
 from telegram import Update
 from telegram.constants import ChatAction
+from telegram.error import Conflict
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -153,6 +154,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(f"❌ Sorry, something went wrong:\n{detail}")
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Keep polling alive through transient errors (e.g. deploy-overlap conflicts)."""
+    if isinstance(context.error, Conflict):
+        logger.warning("Transient getUpdates conflict (another instance still stopping); retrying.")
+        return
+    logger.error("Unhandled exception: %s", context.error)
+
+
 def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -161,6 +170,7 @@ def main() -> None:
         raise SystemExit("ANTHROPIC_API_KEY environment variable not set")
 
     application = Application.builder().token(token).build()
+    application.add_error_handler(on_error)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("clear", clear_command))
