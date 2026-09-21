@@ -70,8 +70,9 @@ async def ask_claude(messages: list[dict]) -> tuple[str, str]:
             )
         except APIStatusError as exc:
             last_error = exc
-            # 404 = model retired/not found; 400 may also mention unknown model.
-            retriable = exc.status_code == 404 or (
+            # 404 = model retired/not found; 429 = quota/rate-limit (try next
+            # model in the chain); 400 may also mention unknown model.
+            retriable = exc.status_code in (404, 429) or (
                 exc.status_code == 400 and "model" in str(exc).lower()
             )
             if retriable:
@@ -145,6 +146,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.exception("Error processing message")
         user_conversations[user_id].pop()  # roll back the unmatched user turn
         detail = str(exc)
+        if exc.__cause__:
+            detail += f"\n{exc.__cause__}"
         if len(detail) > 300:
             detail = detail[:300] + "…"
         await update.message.reply_text(f"❌ Sorry, something went wrong:\n{detail}")
